@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive Airy-theory demo of the interference rainbow and its supernumerary bows.">
+<title>Interference Rainbow Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+/* Layout: instrument bench — control rail on the left, wavefront diagram as the hero, far-field chart and sky view below. */
+:root{
+  --bg:#f5f6f9; --panel:#ffffff; --fg:#18203a; --muted:#5d6580; --line:#d9dce6;
+  --wave:#2340c8; --wave-soft:rgba(35,64,200,.85); --hot:#d23a2c; --ray:#e08a1e; --grid:#e7e9f0;
+  --f-display:"Spectral",Georgia,"Times New Roman",serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1120; --panel:#141a2d; --fg:#e4e8f4; --muted:#98a0bb; --line:#262e47;
+  --wave:#7f9bff; --wave-soft:rgba(127,155,255,.8); --hot:#ff6b5b; --ray:#ffb257; --grid:#1f2740; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1120; --panel:#141a2d; --fg:#e4e8f4; --muted:#98a0bb; --line:#262e47;
+  --wave:#7f9bff; --wave-soft:rgba(127,155,255,.8); --hot:#ff6b5b; --ray:#ffb257; --grid:#1f2740; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
+header h1{font-family:var(--f-display);font-weight:600;font-size:clamp(28px,4vw,40px);line-height:1.1;margin:0;text-wrap:balance}
+header p{margin:8px 0 0;max-width:68ch;color:var(--muted)}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--wave)}
+.bench{display:grid;grid-template-columns:290px minmax(0,1fr);gap:22px;align-items:start}
+.rail{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:16px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+.rail h2,.card h2{font-family:var(--f-display);font-weight:600;font-size:19px;margin:0}
+.ctl{display:grid;gap:4px}
+.ctl label{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:500}
+.ctl output{font-family:var(--f-mono);font-size:12.5px;color:var(--wave);font-variant-numeric:tabular-nums}
+.ctl small{color:var(--muted);font-size:12px;line-height:1.35}
+input[type=range]{width:100%;accent-color:var(--wave)}
+.checks{display:grid;gap:6px;font-size:13px}
+.checks label{display:flex;gap:8px;align-items:center}
+input[type=checkbox]{accent-color:var(--wave)}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{font:500 12.5px var(--f-body);color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer}
+.presets button:hover{border-color:var(--wave);color:var(--wave)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
+.readout{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+.readout dt{color:var(--muted)} .readout dd{margin:0;font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+.main{display:grid;gap:22px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px;min-width:0}
+.card .head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 14px}
+.card .head p{margin:0;color:var(--muted);font-size:13px}
+canvas{display:block;width:100%;max-width:100%;touch-action:none}
+#diag{aspect-ratio:1.12/1}
+#chart{aspect-ratio:1.55/1}
+#sky{aspect-ratio:1.55/1;border-radius:6px}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:18px;height:0;border-top:2px solid}
+.hint{font-family:var(--f-mono);font-size:12px;color:var(--muted);min-height:1.4em}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.notes div{min-width:0}
+.notes h3{font-family:var(--f-display);font-size:17px;font-weight:600;margin:0 0 4px}
+.notes p{margin:0;color:var(--muted);font-size:14px;max-width:60ch}
+@media (max-width:980px){.bench{grid-template-columns:1fr}.rail{position:static}.pair,.notes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="eyebrow">Airy theory · primary bow · one internal reflection</div>
+  <h1>Interference Rainbow Lab</h1>
+  <p>Sunlight enters a water drop, reflects once and leaves. Near the rainbow angle two rays leave in the same direction with different path lengths, so their wavefronts cross and interfere. The bright fringes inside the main bow are the supernumerary bows. Change the drop and watch the near-field wavefronts, the far-field intensity and the sky.</p>
+</header>
+
+<div class="bench">
+<aside class="rail" aria-label="Parameters">
+  <h2>Parameters</h2>
+  <div class="presets" role="group" aria-label="Drop presets">
+    <button type="button" data-a="25">Fog 25 µm</button>
+    <button type="button" data-a="200">Drizzle 0.2 mm</button>
+    <button type="button" data-a="1000">Rain 1 mm</button>
+  </div>
+  <div class="ctl">
+    <label for="a">Drop radius <output id="aOut"></output></label>
+    <input id="a" type="range" min="0" max="1000" step="1">
+    <small>Smaller drops spread the fringes wider.</small>
+  </div>
+  <div class="ctl">
+    <label for="lam">Wavelength (monochrome) <output id="lamOut"></output></label>
+    <input id="lam" type="range" min="400" max="700" step="1" value="650">
+  </div>
+  <div class="ctl">
+    <label for="nd"><span>Refractive index n<sub>D</sub></span> <output id="ndOut"></output></label>
+    <input id="nd" type="range" min="1.25" max="1.45" step="0.001" value="1.333">
+    <small>Water is 1.333. Dispersion follows water.</small>
+  </div>
+  <div class="ctl">
+    <label for="ex">Diagram size a/λ <output id="exOut"></output></label>
+    <input id="ex" type="range" min="8" max="70" step="1" value="26">
+    <small>Wavelength is exaggerated so the wavefronts stay visible. Real drops have a/λ in the hundreds to thousands.</small>
+  </div>
+  <div class="ctl">
+    <label for="sun">Sun elevation <output id="sunOut"></output></label>
+    <input id="sun" type="range" min="0" max="38" step="0.5" value="6">
+  </div>
+  <div class="ctl">
+    <label for="fov">Sky field of view <output id="fovOut"></output></label>
+    <input id="fov" type="range" min="12" max="110" step="1" value="90">
+  </div>
+  <div class="checks">
+    <label><input id="disk" type="checkbox" checked> Blur by sun's disk (0.53°)</label>
+    <label><input id="geo" type="checkbox" checked> Show geometric-optics curve</label>
+    <label><input id="rays" type="checkbox"> Show rays in diagram</label>
+  </div>
+  <dl class="readout">
+    <dt>Rainbow angle θ<sub>R</sub> at λ</dt><dd id="rThR"></dd>
+    <dt>n at λ</dt><dd id="rN"></dd>
+    <dt>Descartes impact b/a</dt><dd id="rXc"></dd>
+    <dt>Size parameter 2πa/λ</dt><dd id="rX"></dd>
+    <dt>Main → 1st supernumerary</dt><dd id="rSp"></dd>
+    <dt>Red–violet bow width</dt><dd id="rW"></dd>
+  </dl>
+</aside>
+
+<div class="main">
+  <section class="card">
+    <div class="head"><h2>Wavefronts through the drop</h2><p>Hover the far-field chart to trace the two rays that leave at that angle.</p></div>
+    <canvas id="diag" aria-label="Wavefronts of sunlight passing through a water drop, folding into a cusp near the rainbow angle"></canvas>
+    <div class="legend">
+      <span><i class="sw" style="border-color:var(--wave)"></i>wavefront (one per λ)</span>
+      <span><i class="sw" style="border-color:var(--hot)"></i>Descartes (minimum-deviation) ray</span>
+      <span><i class="sw" style="border-color:var(--ray)"></i>two rays at the hovered angle</span>
+    </div>
+    <div class="hint" id="pathHint">Hover the chart below to compare the two paths.</div>
+  </section>
+
+  <div class="pair">
+    <section class="card">
+      <div class="head"><h2>Far-field intensity</h2><p>Angle from the antisolar point</p></div>
+      <canvas id="chart" aria-label="Intensity versus rainbow angle"></canvas>
+      <div class="legend">
+        <span><i class="sw" id="monoSw" style="border-color:var(--wave)"></i>Airy, monochrome</span>
+        <span><i class="sw" style="border-color:var(--muted);border-top-style:dashed"></i>geometric optics</span>
+        <span>strip: white sunlight</span>
+      </div>
+    </section>
+    <section class="card">
+      <div class="head"><h2>Observed bow</h2><p>White sunlight summed over 380–720 nm</p></div>
+      <canvas id="sky" aria-label="Simulated view of the rainbow in the sky"></canvas>
+      <div class="hint">Narrow the field of view to zoom on the top of the arc.</div>
+    </section>
+  </div>
+
+  <section class="notes">
+    <div><h3>Why a fold</h3><p>The exit angle rises with impact parameter, peaks at the Descartes ray, then falls. Rays pile up at that maximum, so the wavefront folds into a cusp and geometric optics predicts infinite brightness at θ<sub>R</sub>.</p></div>
+    <div><h3>Why fringes</h3><p>Inside θ<sub>R</sub> every direction is reached by two rays, one on each side of the Descartes ray. Their path difference grows as you move inward, so brightness alternates. Airy's integral gives the shape: intensity ∝ Ai²(−z).</p></div>
+    <div><h3>Why big drops hide them</h3><p>Fringe spacing scales as (λ/a)<sup>2/3</sup>. For millimetre raindrops the fringes become narrower than the sun's disk and the spread between colours, so they wash out.</p></div>
+  </section>
+</div>
+</div>
+</div>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const D2R=Math.PI/180;
+const S={a:250,lam:650,nd:1.333,ex:26,sun:6,fov:90,disk:true,geo:true,rays:false,hover:null};
+
+/* ---------- optics ---------- */
+const nAt=(lam,nd)=>nd-1.33298+1.3240+3046/(lam*lam); // water dispersion, shifted
+const thetaOf=(x,n)=>4*Math.asin(x/n)-2*Math.asin(x);   // rainbow angle (rad) from antisolar point
+const xcOf=n=>Math.sqrt(Math.max(0,(4-n*n)/3));
+function hOf(n){const x=xcOf(n),e=1e-4;return -(thetaOf(x+e,n)-2*thetaOf(x,n)+thetaOf(x-e,n))/(e*e);}
+function fresnelT(n){const x=xcOf(n),i=Math.asin(x),r=Math.asin(x/n),ci=Math.cos(i),cr=Math.cos(r);
+  const rs=((ci-n*cr)/(ci+n*cr))**2, rp=((n*ci-cr)/(n*ci+cr))**2;
+  return (1-rs)**2*rs+(1-rp)**2*rp;}
+function airy(y){
+  if(y>6){const z=2/3*Math.pow(y,1.5);return Math.exp(-z)/(2*Math.sqrt(Math.PI)*Math.pow(y,.25))*(1-5/(72*z));}
+  if(y<-6){const t=-y,z=2/3*Math.pow(t,1.5),p=z+Math.PI/4;
+    return Math.pow(t,-.25)/Math.sqrt(Math.PI)*(Math.sin(p)*(1-385/(10368*z*z))-Math.cos(p)*5/(72*z));}
+  const y3=y*y*y;let f=1,g=y,tf=1,tg=y;
+  for(let k=0;k<60;k++){tf*=y3/((3*k+2)*(3*k+3));tg*=y3/((3*k+3)*(3*k+4));f+=tf;g+=tg;if(Math.abs(tf)+Math.abs(tg)<1e-17)break;}
+  return 0.355028053887817*f-0.258819403792807*g;}
+const AIRY_MAX=[1.01879,3.24820,4.82010,6.16331];
+// angular scale: z = C (θR - ψ),  C = (2 x² / h)^(1/3), x = 2πa/λ
+const Cof=(x,h)=>Math.cbrt(2*x*x/h);
+
+/* ray trace in units of drop radius; light travels +x, b>0 */
+const X0=-2.6;
+function refr(d,N,eta){const c=-(N[0]*d[0]+N[1]*d[1]),k=1-eta*eta*(1-c*c),s=Math.sqrt(Math.max(0,k));
+  return [eta*d[0]+(eta*c-s)*N[0],eta*d[1]+(eta*c-s)*N[1]];}
+function trace(b,n){
+  const P1=[-Math.sqrt(1-b*b),b];const t=refr([1,0],P1,1/n);
+  let s=-2*(P1[0]*t[0]+P1[1]*t[1]);const P2=[P1[0]+s*t[0],P1[1]+s*t[1]];const l1=s;
+  const dn=t[0]*P2[0]+t[1]*P2[1];const r=[t[0]-2*dn*P2[0],t[1]-2*dn*P2[1]];
+  s=-2*(P2[0]*r[0]+P2[1]*r[1]);const P3=[P2[0]+s*r[0],P2[1]+s*r[1]];const l2=s;
+  const o=refr(r,[-P3[0],-P3[1]],n);
+  const L1=P1[0]-X0, L2=L1+n*l1, L3=L2+n*l2;
+  return {P1,P2,P3,t,r,o,L1,L2,L3};}
+function posAt(q,Sv){
+  if(Sv<=q.L1)return [X0+Sv,q.P1[1]];
+  if(Sv<=q.L2){const d=(Sv-q.L1)/(q.L2-q.L1);return [q.P1[0]+(q.P2[0]-q.P1[0])*d,q.P1[1]+(q.P2[1]-q.P1[1])*d];}
+  if(Sv<=q.L3){const d=(Sv-q.L2)/(q.L3-q.L2);return [q.P2[0]+(q.P3[0]-q.P2[0])*d,q.P2[1]+(q.P3[1]-q.P2[1])*d];}
+  const e=Sv-q.L3;return [q.P3[0]+q.o[0]*e,q.P3[1]+q.o[1]*e];}
+function solveB(psi,n){ // two impact parameters with exit angle psi (< θR)
+  const xc=xcOf(n);if(psi>=thetaOf(xc,n))return null;
+  const bis=(lo,hi,inc)=>{for(let k=0;k<60;k++){const m=(lo+hi)/2,v=thetaOf(m,n);((v<psi)===inc)?lo=m:hi=m;}return (lo+hi)/2;};
+  const b1=bis(1e-6,xc,true);const b2=thetaOf(.999999,n)<psi?bis(xc,.999999,false):null;
+  return [b1,b2];}
+
+/* ---------- colour ---------- */
+const gs=(x,m,a,b)=>{const t=(x-m)/(x<m?a:b);return Math.exp(-.5*t*t);};
+const cmf=l=>[1.056*gs(l,599.8,37.9,31)+.362*gs(l,442,16,26.7)-.065*gs(l,501.1,20.4,26.2),
+  .821*gs(l,568.8,46.9,40.5)+.286*gs(l,530.9,16.3,31.1),1.217*gs(l,437,11.8,36)+.681*gs(l,459,26,13.8)];
+const sunSpec=l=>1/(Math.pow(l/560,5)*(Math.exp(1.4388e7/(l*5778))-1));
+const xyz2rgb=([X,Y,Z])=>[3.2406*X-1.5372*Y-.4986*Z,-.9689*X+1.8758*Y+.0415*Z,.0557*X-.204*Y+1.057*Z];
+const gam=v=>{v=Math.max(0,Math.min(1,v));return v<=.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-.055;};
+const LAMS=[];for(let l=380;l<=720;l+=5)LAMS.push(l);
+const WB=(()=>{let s=[0,0,0];for(const l of LAMS){const c=cmf(l),w=sunSpec(l);s[0]+=c[0]*w;s[1]+=c[1]*w;s[2]+=c[2]*w;}return xyz2rgb(s);})();
+function lamRGB(l){const c=xyz2rgb(cmf(l));const m=Math.max(...c.map((v,i)=>v/WB[i]),1e-9);
+  return 'rgb('+c.map((v,i)=>Math.round(255*gam(Math.max(0,v/WB[i]/m)))).join(',')+')';}
+
+/* white-light spectrum on a fixed angular grid: 0..58°, 0.01° */
+const G0=0,GD=0.01,GN=5801;
+let white=null; // {r,g,b} linear, normalised, plus cumulative sums
+function diskKernel(){const R=0.2665,k=[];let s=0;const m=Math.ceil(R/GD);
+  for(let j=-m;j<=m;j++){const u=j*GD/R;const w=Math.abs(u)<1?Math.sqrt(1-u*u):0;k.push(w);s+=w;}return k.map(v=>v/s);}
+const KER=diskKernel();
+function blur(arr){const m=(KER.length-1)/2,out=new Float32Array(arr.length);
+  for(let i=0;i<arr.length;i++){let s=0;for(let j=0;j<KER.length;j++){let p=i+j-m;p=p<0?0:p>=arr.length?arr.length-1:p;s+=arr[p]*KER[j];}out[i]=s;}return out;}
+function computeWhite(){
+  const X=new Float32Array(GN),Y=new Float32Array(GN),Z=new Float32Array(GN);
+  for(const l of LAMS){
+    const n=nAt(l,S.nd),xc=xcOf(n),thR=thetaOf(xc,n),h=hOf(n),x=2*Math.PI*S.a*1000/l,C=Cof(x,h);
+    const amp=Math.pow(2*S.a*S.a/((2*Math.PI/l)*h),2/3)*fresnelT(n)*sunSpec(l);
+    const c=cmf(l);
+    for(let i=0;i<GN;i++){const psi=(G0+i*GD)*D2R;const ai=airy(-C*(thR-psi));const v=amp*ai*ai;
+      X[i]+=v*c[0];Y[i]+=v*c[1];Z[i]+=v*c[2];}}
+  let R=new Float32Array(GN),Gc=new Float32Array(GN),B=new Float32Array(GN);
+  for(let i=0;i<GN;i++){const q=xyz2rgb([X[i],Y[i],Z[i]]);R[i]=Math.max(0,q[0]/WB[0]);Gc[i]=Math.max(0,q[1]/WB[1]);B[i]=Math.max(0,q[2]/WB[2]);}
+  if(S.disk){R=blur(R);Gc=blur(Gc);B=blur(B);}
+  let mx=0;for(let i=Math.round(30/GD);i<GN;i++)mx=Math.max(mx,R[i],Gc[i],B[i]);
+  const cs=[new Float64Array(GN+1),new Float64Array(GN+1),new Float64Array(GN+1)];
+  for(let i=0;i<GN;i++){R[i]/=mx;Gc[i]/=mx;B[i]/=mx;cs[0][i+1]=cs[0][i]+R[i];cs[1][i+1]=cs[1][i]+Gc[i];cs[2][i+1]=cs[2][i]+B[i];}
+  white={R,G:Gc,B,cs};}
+function whiteAt(deg,wDeg){ // box-filtered colour around deg
+  const half=Math.max(GD/2,wDeg/2);let i0=(deg-half-G0)/GD,i1=(deg+half-G0)/GD;
+  i0=Math.max(0,Math.min(GN,i0));i1=Math.max(0,Math.min(GN,i1));
+  const a=Math.floor(i0),b=Math.floor(i1),span=Math.max(1e-6,i1-i0);
+  const cum=(c,p)=>{const f=Math.floor(p),fr=p-f;return white.cs[c][f]+(f<GN?fr*white[["R","G","B"][c]][f]:0);};
+  return [0,1,2].map(c=>(cum(c,i1)-cum(c,i0))/span);}
+
+/* ---------- canvas helpers ---------- */
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function fit(cv){const r=cv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);
+  const w=Math.max(10,Math.round(r.width*d)),h=Math.max(10,Math.round(r.height*d));
+  if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}const c=cv.getContext('2d');c.setTransform(d,0,0,d,0,0);return {c,W:r.width,H:r.height};}
+
+/* ---------- diagram ---------- */
+function drawDiagram(){
+  const {c,W,H}=fit($('diag'));c.clearRect(0,0,W,H);
+  const n=nAt(S.lam,S.nd);
+  const vx0=-5.6,vx1=1.7,vy0=-5.1,vy1=1.75;
+  const sc=Math.min(W/(vx1-vx0),H/(vy1-vy0)),ox=(W-(vx1-vx0)*sc)/2,oy=(H-(vy1-vy0)*sc)/2;
+  const P=p=>[ox+(p[0]-vx0)*sc,oy+(vy1-p[1])*sc];
+  const wave=css('--wave'),hot=css('--hot'),ray=css('--ray'),muted=css('--muted'),fg=css('--fg');
+  // drop
+  c.strokeStyle=muted;c.lineWidth=1;c.setLineDash([3,3]);
+  c.beginPath();const o=P([0,0]);c.arc(o[0],o[1],sc,0,Math.PI*2);c.stroke();c.setLineDash([]);
+  // traces
+  const NB=320,bs=[],qs=[];for(let i=0;i<NB;i++){const b=0.18+(0.9995-0.18)*i/(NB-1);bs.push(b);qs.push(trace(b,n));}
+  const Lout=5.4,lamd=1/S.ex;let Smax=0;for(const q of qs)Smax=Math.max(Smax,q.L3);Smax+=Lout;
+  const R2=5.6*5.6;
+  c.strokeStyle=wave;c.lineWidth=Math.max(.6,Math.min(1.25,sc/ (S.ex*1.6)));
+  c.beginPath();
+  for(let Sv=lamd*0.5;Sv<Smax;Sv+=lamd){
+    let pen=false;
+    for(let i=0;i<NB;i++){const q=qs[i];
+      if(Sv>q.L3+Lout){pen=false;continue;}
+      const p=posAt(q,Sv);if(p[0]*p[0]+p[1]*p[1]>R2||p[0]<vx0||p[1]<vy0){pen=false;continue;}
+      const s=P(p);if(pen)c.lineTo(s[0],s[1]);else{c.moveTo(s[0],s[1]);pen=true;}}
+  }
+  c.stroke();
+  const drawRay=(b,col,w,len)=>{const q=trace(b,n);const e=[q.P3[0]+q.o[0]*len,q.P3[1]+q.o[1]*len];
+    c.strokeStyle=col;c.lineWidth=w;c.beginPath();[[X0,b],q.P1,q.P2,q.P3,e].map(P).forEach((s,i)=>i?c.lineTo(s[0],s[1]):c.moveTo(s[0],s[1]));c.stroke();return q;};
+  if(S.rays){c.globalAlpha=.35;for(let b=0.2;b<1;b+=0.08)drawRay(b,muted,.8,5.2);c.globalAlpha=1;}
+  drawRay(xcOf(n),hot,1.8,5.4);
+  // airy maxima arrows for diagram scale
+  const h=hOf(n),thR=thetaOf(xcOf(n),n),C=Cof(2*Math.PI*S.ex,h);
+  const labels=['rainbow maximum','1st supernumerary','2nd supernumerary','3rd supernumerary'];
+  c.font='600 12.5px "IBM Plex Sans", system-ui, sans-serif';c.textBaseline='middle';
+  AIRY_MAX.forEach((z,k)=>{const psi=thR-z/C;if(psi<0.2)return;
+    const u=[-Math.cos(psi),-Math.sin(psi)],r0=5.75,r1=6.25;
+    const a=P([u[0]*r0,u[1]*r0]),b2=P([u[0]*r1,u[1]*r1]);
+    if(b2[1]>H-8||b2[0]<4)return;
+    c.strokeStyle=fg;c.lineWidth=1.2;c.beginPath();c.moveTo(a[0],a[1]);c.lineTo(b2[0],b2[1]);c.stroke();
+    const ang=Math.atan2(b2[1]-a[1],b2[0]-a[0]);c.fillStyle=fg;c.beginPath();
+    c.moveTo(b2[0],b2[1]);c.lineTo(b2[0]-8*Math.cos(ang-.4),b2[1]-8*Math.sin(ang-.4));c.lineTo(b2[0]-8*Math.cos(ang+.4),b2[1]-8*Math.sin(ang+.4));c.fill();
+    const tw=c.measureText(labels[k]).width;let tx=Math.min(W-tw-4,a[0]+10),ty=a[1]-14;
+    if(k===0){tx=Math.max(4,b2[0]-tw/2);ty=Math.min(H-10,b2[1]+12);}
+    c.lineWidth=4;c.strokeStyle=css('--panel');c.strokeText(labels[k],tx,ty);c.fillText(labels[k],tx,ty);});
+  // incoming label
+  c.fillStyle=muted;c.font='500 12.5px "IBM Plex Sans", system-ui, sans-serif';
+  const lp=P([X0,1.35]);c.fillText('sunlight →',lp[0],lp[1]);
+  // hovered pair
+  const hint=$('pathHint');
+  if(S.hover!=null){const psi=S.hover*D2R,bb=solveB(psi,n);
+    if(bb&&bb[1]!=null){const q1=drawRay(bb[0],ray,2,5.6),q2=drawRay(bb[1],ray,2,5.6);
+      const u=[-Math.cos(psi),-Math.sin(psi)];
+      const ph=q=>q.L3-(u[0]*q.P3[0]+u[1]*q.P3[1]);
+      const d=Math.abs(ph(q1)-ph(q2));
+      hint.textContent=`ψ = ${S.hover.toFixed(2)}°  ·  b/a = ${bb[0].toFixed(3)} and ${bb[1].toFixed(3)}  ·  path difference ${(d*S.ex).toFixed(2)} λ in the diagram, ${(d*S.a*1000/S.lam).toFixed(1)} λ for the real drop`;}
+    else hint.textContent=`ψ = ${S.hover.toFixed(2)}° lies outside θR: no ray reaches it (Alexander's dark band). Only diffraction leaks light here.`;}
+  else hint.textContent='Hover the far-field chart to compare the two paths.';
+}
+
+/* ---------- chart ---------- */
+let chartMap=null;
+function drawChart(){
+  const {c,W,H}=fit($('chart'));c.clearRect(0,0,W,H);
+  const n=nAt(S.lam,S.nd),h=hOf(n),thR=thetaOf(xcOf(n),n)/D2R,x=2*Math.PI*S.a*1000/S.lam,C=Cof(x,h)*D2R; // per degree
+  const win=Math.min(26,Math.max(2.6,16/C)),wout=Math.min(8,Math.max(1.3,4/C));
+  const a0=Math.max(1,thR-win),a1=Math.min(57.5,thR+wout);
+  const L=44,R=12,T=12,strip=22,B=34+strip+8,pw=W-L-R,ph=H-T-B;
+  const X=a=>L+(a-a0)/(a1-a0)*pw;chartMap={a0,a1,L,pw};
+  const muted=css('--muted'),grid=css('--grid'),fg=css('--fg');
+  // mono Airy
+  const N=Math.max(400,Math.round(pw*2)),ys=[],gs2=[];let mx=0;
+  const dk=S.disk?KER:null;
+  for(let i=0;i<N;i++){const a=a0+(a1-a0)*i/(N-1);let v;
+    if(dk){v=0;const m=(dk.length-1)/2;for(let j=0;j<dk.length;j++){const ai=airy(-C*(thR-(a+(j-m)*GD)));v+=ai*ai*dk[j];}}
+    else{const ai=airy(-C*(thR-a));v=ai*ai;}
+    ys.push(v);mx=Math.max(mx,v);}
+  // geometric: I ∝ 1/sqrt(θR-ψ) per same normalisation of asymptote: Ai²(-z) avg ≈ 1/(2π sqrt z)
+  for(let i=0;i<N;i++){const a=a0+(a1-a0)*i/(N-1);const z=C*(thR-a);gs2.push(z>0?1/(2*Math.PI*Math.sqrt(z)):null);}
+  const top=mx*1.12,Y=v=>T+ph-(Math.min(v,top)/top)*ph;
+  // grid
+  c.strokeStyle=grid;c.lineWidth=1;c.fillStyle=muted;c.font='11.5px "IBM Plex Mono", ui-monospace, monospace';c.textAlign='center';c.textBaseline='top';
+  const span=a1-a0,steps=[.1,.2,.25,.5,1,2,5,10];let st=steps.find(s=>span/s<=8)||10;
+  for(let a=Math.ceil(a0/st)*st;a<=a1+1e-9;a+=st){const px=X(a);c.beginPath();c.moveTo(px,T);c.lineTo(px,T+ph);c.stroke();c.fillText((st<1?a.toFixed(st<.25?2:1):a.toFixed(0))+'°',px,T+ph+strip+12);}
+  c.beginPath();c.moveTo(L,T+ph);c.lineTo(L+pw,T+ph);c.strokeStyle=muted;c.stroke();
+  c.save();c.translate(14,T+ph/2);c.rotate(-Math.PI/2);c.textBaseline='middle';c.fillText('intensity',0,0);c.restore();
+  // θR marker
+  c.strokeStyle=css('--hot');c.setLineDash([4,4]);c.beginPath();c.moveTo(X(thR),T);c.lineTo(X(thR),T+ph);c.stroke();c.setLineDash([]);
+  c.fillStyle=css('--hot');c.textAlign='left';c.fillText('θR',X(thR)+4,T+2);
+  // geometric
+  if(S.geo){c.strokeStyle=muted;c.setLineDash([5,4]);c.lineWidth=1.3;c.beginPath();let pen=false;
+    gs2.forEach((v,i)=>{if(v==null){pen=false;return;}const px=L+pw*i/(N-1),py=Y(v);pen?c.lineTo(px,py):c.moveTo(px,py);pen=true;});c.stroke();c.setLineDash([]);}
+  // airy
+  c.save();c.beginPath();c.rect(L,T,pw,ph);c.clip();
+  const col=lamRGB(S.lam);c.fillStyle=col;c.globalAlpha=.16;c.beginPath();c.moveTo(L,T+ph);
+  ys.forEach((v,i)=>c.lineTo(L+pw*i/(N-1),Y(v)));c.lineTo(L+pw,T+ph);c.fill();c.globalAlpha=1;
+  c.strokeStyle=col;c.lineWidth=2;c.beginPath();ys.forEach((v,i)=>{const px=L+pw*i/(N-1);i?c.lineTo(px,Y(v)):c.moveTo(px,Y(v));});c.stroke();c.restore();
+  $('monoSw').style.borderColor=col;
+  // white strip
+  const sy=T+ph+4,sw=Math.ceil(pw);const img=c.createImageData(Math.ceil(pw*2),1);
+  for(let i=0;i<img.width;i++){const a=a0+(a1-a0)*i/img.width;const q=whiteAt(a,(a1-a0)/img.width);
+    const k=i*4;img.data[k]=255*gam(q[0]);img.data[k+1]=255*gam(q[1]);img.data[k+2]=255*gam(q[2]);img.data[k+3]=255;}
+  const tmp=document.createElement('canvas');tmp.width=img.width;tmp.height=1;tmp.getContext('2d').putImageData(img,0,0);
+  c.imageSmoothingEnabled=true;c.drawImage(tmp,L,sy,pw,strip-4);
+  // hover
+  if(S.hover!=null&&S.hover>=a0&&S.hover<=a1){c.strokeStyle=css('--ray');c.lineWidth=1.5;c.beginPath();c.moveTo(X(S.hover),T);c.lineTo(X(S.hover),sy+strip-4);c.stroke();}
+  // readouts
+  const xc=xcOf(n);
+  $('rThR').textContent=thR.toFixed(2)+'°';$('rN').textContent=n.toFixed(4);$('rXc').textContent=xc.toFixed(3);
+  $('rX').textContent=Math.round(x).toLocaleString();
+  $('rSp').textContent=((AIRY_MAX[1]-AIRY_MAX[0])/C).toFixed(2)+'°';
+  const tr=l=>{const nn=nAt(l,S.nd);return thetaOf(xcOf(nn),nn)/D2R;};$('rW').textContent=(tr(700)-tr(400)).toFixed(2)+'°';
+}
+
+/* ---------- sky ---------- */
+function drawSky(){
+  const cv=$('sky'),r=cv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);
+  const W=Math.max(10,Math.round(r.width*d)),H=Math.max(10,Math.round(r.height*d));
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
+  const c=cv.getContext('2d');const img=c.createImageData(W,H);
+  const fov=S.fov*D2R,pxAng=S.fov/W,es=S.sun*D2R;
+  const n=nAt(589,S.nd),thR=thetaOf(xcOf(n),n)/D2R,elTop=thR-S.sun;
+  const t=1-(S.fov-12)/(110-12);
+  const elC=(1-t)*(S.fov*H/W*0.5-2)+t*(elTop-0.5);
+  const A=[0,-Math.sin(es),Math.cos(es)];
+  const lin=v=>v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);
+  for(let y=0;y<H;y++){
+    const el=(elC+((H/2-y)*pxAng))*D2R;
+    for(let x=0;x<W;x++){
+      const az=(x-W/2)*pxAng*D2R;const ce=Math.cos(el);
+      const v=[ce*Math.sin(az),Math.sin(el),ce*Math.cos(az)];
+      const ang=Math.acos(Math.max(-1,Math.min(1,v[0]*A[0]+v[1]*A[1]+v[2]*A[2])))/D2R;
+      let base;const k=(y*W+x)*4;
+      if(el<0){const g=Math.min(1,-el/0.35);base=[lin(.24)-.03*g,lin(.27)-.03*g,lin(.22)-.02*g];}
+      else{const u=Math.min(1,el/0.9);base=[lin(.50-.22*u),lin(.58-.18*u),lin(.70-.06*u)];}
+      let q=[0,0,0];
+      if(el>=0&&ang<57.9)q=whiteAt(ang,pxAng*1.4);
+      const g=0.55;
+      img.data[k]=255*gam(base[0]+g*q[0]);img.data[k+1]=255*gam(base[1]+g*q[1]);img.data[k+2]=255*gam(base[2]+g*q[2]);img.data[k+3]=255;
+    }}
+  c.putImageData(img,0,0);
+  c.setTransform(d,0,0,d,0,0);c.fillStyle='rgba(255,255,255,.85)';c.font='11.5px "IBM Plex Mono", ui-monospace, monospace';
+  c.fillText(`sun ${S.sun}° behind you · FOV ${S.fov}°`,10,18);
+}
+
+/* ---------- wiring ---------- */
+const aFromSlider=v=>Math.round(10*Math.pow(10,v/1000*Math.log10(300)));
+const sliderFromA=a=>Math.round(1000*Math.log10(a/10)/Math.log10(300));
+let pending={white:true},raf=0;
+function schedule(w){if(w)pending.white=true;if(!raf)raf=requestAnimationFrame(()=>{raf=0;
+  if(pending.white){computeWhite();pending.white=false;}drawDiagram();drawChart();drawSky();});}
+function sync(){
+  $('aOut').textContent=S.a>=1000?(S.a/1000).toFixed(2)+' mm':S.a+' µm';
+  $('lamOut').textContent=S.lam+' nm';$('ndOut').textContent=S.nd.toFixed(3);
+  $('exOut').textContent=S.ex;$('sunOut').textContent=S.sun+'°';$('fovOut').textContent=S.fov+'°';}
+$('a').value=sliderFromA(S.a);
+$('a').addEventListener('input',e=>{S.a=aFromSlider(+e.target.value);sync();schedule(true);});
+$('lam').addEventListener('input',e=>{S.lam=+e.target.value;sync();schedule(false);});
+$('nd').addEventListener('input',e=>{S.nd=+e.target.value;sync();schedule(true);});
+$('ex').addEventListener('input',e=>{S.ex=+e.target.value;sync();schedule(false);});
+$('sun').addEventListener('input',e=>{S.sun=+e.target.value;sync();schedule(false);});
+$('fov').addEventListener('input',e=>{S.fov=+e.target.value;sync();schedule(false);});
+$('disk').addEventListener('change',e=>{S.disk=e.target.checked;schedule(true);});
+$('geo').addEventListener('change',e=>{S.geo=e.target.checked;schedule(false);});
+$('rays').addEventListener('change',e=>{S.rays=e.target.checked;schedule(false);});
+document.querySelectorAll('.presets button').forEach(b=>b.addEventListener('click',()=>{S.a=+b.dataset.a;$('a').value=sliderFromA(S.a);S.a=+b.dataset.a;sync();schedule(true);}));
+const ch=$('chart');
+function hov(e){if(!chartMap)return;const r=ch.getBoundingClientRect();const px=e.clientX-r.left;
+  const a=chartMap.a0+(px-chartMap.L)/chartMap.pw*(chartMap.a1-chartMap.a0);
+  S.hover=(px<chartMap.L||px>chartMap.L+chartMap.pw)?null:a;schedule(false);}
+ch.addEventListener('pointermove',hov);ch.addEventListener('pointerdown',hov);
+ch.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'){S.hover=null;schedule(false);}});
+new ResizeObserver(()=>schedule(false)).observe(document.querySelector('.main'));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>schedule(false));
+new MutationObserver(()=>schedule(false)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+// start with a hovered angle so the two-ray construction is visible at rest
+{const n=nAt(S.lam,S.nd);S.hover=thetaOf(xcOf(n),n)/D2R-3.2;}
+sync();schedule(true);
+})();
+</script>
+</body>
+</html>
