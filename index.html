@@ -43,7 +43,8 @@ header p{margin:8px 0 0;max-width:68ch;color:var(--muted)}
 .ctl small{color:var(--muted);font-size:12px;line-height:1.35}
 input[type=range]{width:100%;accent-color:var(--wave)}
 .checks{display:grid;gap:6px;font-size:13px}
-.checks label{display:flex;gap:8px;align-items:center}
+.checks label,.ctl label.inline{display:flex;gap:8px;align-items:center;justify-content:flex-start;font-weight:400}
+input[type=range]:disabled{opacity:.55}
 input[type=checkbox]{accent-color:var(--wave)}
 .presets{display:flex;flex-wrap:wrap;gap:6px}
 .presets button{font:500 12.5px var(--f-body);color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer}
@@ -102,9 +103,10 @@ canvas{display:block;width:100%;max-width:100%;touch-action:none}
     <small>Water is 1.333. Dispersion follows water.</small>
   </div>
   <div class="ctl">
-    <label for="ex">Diagram size a/λ <output id="exOut"></output></label>
+    <label for="ex">Wavefront density a/λ <output id="exOut"></output></label>
     <input id="ex" type="range" min="8" max="70" step="1" value="26">
-    <small>Wavelength is exaggerated so the wavefronts stay visible. Real drops have a/λ in the hundreds to thousands.</small>
+    <label class="inline" for="follow"><input id="follow" type="checkbox" checked> Follow drop radius</label>
+    <small>Real drops hold hundreds to thousands of wavelengths, too many to draw. The diagram scales the drop down on a log scale, so a smaller drop shows fewer wavefronts and wider fringes. Untick to set it by hand.</small>
   </div>
   <div class="ctl">
     <label for="sun">Sun elevation <output id="sunOut"></output></label>
@@ -170,7 +172,8 @@ canvas{display:block;width:100%;max-width:100%;touch-action:none}
 (()=>{
 const $=id=>document.getElementById(id);
 const D2R=Math.PI/180;
-const S={a:250,lam:650,nd:1.333,ex:26,sun:6,fov:90,disk:true,geo:true,rays:false,hover:null};
+const S={a:250,lam:650,nd:1.333,ex:26,sun:6,fov:90,disk:true,geo:true,rays:false,hover:null,follow:true};
+const exAuto=()=>{const x=S.a*1000/S.lam;return Math.max(8,Math.min(70,Math.round(8*Math.pow(x/15,0.379))));};
 
 /* ---------- optics ---------- */
 const nAt=(lam,nd)=>nd-1.33298+1.3240+3046/(lam*lam); // water dispersion, shifted
@@ -308,6 +311,9 @@ function drawDiagram(){
   // incoming label
   c.fillStyle=muted;c.font='500 12.5px "IBM Plex Sans", system-ui, sans-serif';
   const lp=P([X0,1.35]);c.fillText('sunlight →',lp[0],lp[1]);
+  const xr=S.a*1000/S.lam;c.textBaseline='top';
+  c.fillText(`drop radius ${S.a>=1000?(S.a/1000).toFixed(2)+' mm':S.a+' µm'}  ·  drawn at a/λ = ${S.ex}`,8,8);
+  c.fillText(`real drop a/λ = ${Math.round(xr).toLocaleString()}  (λ enlarged ${(xr/S.ex).toFixed(0)}×)`,8,26);c.textBaseline='middle';
   // hovered pair
   const hint=$('pathHint');
   if(S.hover!=null){const psi=S.hover*D2R,bb=solveB(psi,n);
@@ -412,6 +418,7 @@ let pending={white:true},raf=0;
 function schedule(w){if(w)pending.white=true;if(!raf)raf=requestAnimationFrame(()=>{raf=0;
   if(pending.white){computeWhite();pending.white=false;}drawDiagram();drawChart();drawSky();});}
 function sync(){
+  if(S.follow){S.ex=exAuto();$('ex').value=S.ex;}$('ex').disabled=S.follow;
   $('aOut').textContent=S.a>=1000?(S.a/1000).toFixed(2)+' mm':S.a+' µm';
   $('lamOut').textContent=S.lam+' nm';$('ndOut').textContent=S.nd.toFixed(3);
   $('exOut').textContent=S.ex;$('sunOut').textContent=S.sun+'°';$('fovOut').textContent=S.fov+'°';}
@@ -420,6 +427,7 @@ $('a').addEventListener('input',e=>{S.a=aFromSlider(+e.target.value);sync();sche
 $('lam').addEventListener('input',e=>{S.lam=+e.target.value;sync();schedule(false);});
 $('nd').addEventListener('input',e=>{S.nd=+e.target.value;sync();schedule(true);});
 $('ex').addEventListener('input',e=>{S.ex=+e.target.value;sync();schedule(false);});
+$('follow').addEventListener('change',e=>{S.follow=e.target.checked;sync();schedule(false);});
 $('sun').addEventListener('input',e=>{S.sun=+e.target.value;sync();schedule(false);});
 $('fov').addEventListener('input',e=>{S.fov=+e.target.value;sync();schedule(false);});
 $('disk').addEventListener('change',e=>{S.disk=e.target.checked;schedule(true);});
